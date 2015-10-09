@@ -2,7 +2,6 @@
 #define TESTSCENE_HPP
 
 #include "LuminaGL.hpp"
-#include "Graphics\CameraSingletonDSA.hpp"
 
 using namespace LuminaGL;
 
@@ -19,8 +18,9 @@ public:
 private:
 	void MoveCamera(float dt);
 
-	CameraSingleton* camera;
-
+	Camera camera;
+	
+	const float TRIANGLESIZE = 1.0f;
 	bool polygonFlag;
 
 	//Camera camera;

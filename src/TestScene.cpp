@@ -10,52 +10,46 @@ TestScene::~TestScene()
 
 void TestScene::LoadAssets()
 {
-	camera = CameraSingleton::GetInstance();
+	camera.Initialize();
 
-	camera->Initialize();
+	//--------------------------
+	// Creates the triangle mesh
+	//--------------------------
+	float halfSize = TRIANGLESIZE * 0.5f;
+	MeshVertex vertices[3] = {
+		{ Vector3(-halfSize, -halfSize, 0.0f), Vector2(0.0f, 0.0f), Color::Red, Vector3(0.0f, 0.0f, -1.0f), Vector3(-1.0f, 0.0f, 0.0f) },
+		{ Vector3(halfSize, -halfSize, 0.0f), Vector2(0.0f, 0.0f), Color::Red, Vector3(0.0f, 0.0f, -1.0f), Vector3(-1.0f, 0.0f, 0.0f) },
+		{ Vector3(0.0f, halfSize, 0.0f), Vector2(0.0f, 0.0f), Color::Red, Vector3(0.0f, 0.0f, -1.0f), Vector3(-1.0f, 0.0f, 0.0f) },
+	};
+	size_t indices[3] = { 0, 2, 1 };
 
-	meshes.push_back(new Mesh(MeshBuilder::CreateCone(1.0f, 2.0f, 20, 5, Color::Red)));
-	meshes.push_back(new Mesh(MeshBuilder::CreateCylinder(2.0f, 4.0f, 20, 5, Color::Green)));
-	meshes.push_back(new Mesh(MeshBuilder::CreateCube(2.0f, Color::Blue)));
-	meshes.push_back(new Mesh(MeshBuilder::CreateSphere(1.5f, 4, Color::RebeccaPurple)));
-	meshes.push_back(new Mesh(MeshBuilder::CreateTorus(1.2f, 0.6f, 20, Color::PapayaWhip)));
+	MeshData d;
+	d.vertices.resize(3);
+	d.indices.resize(3);
 
-	mats.push_back(new Material());
-	mats[0]->LoadShader("Shaders/default.vert", ShaderType::Vertex);
-	mats[0]->LoadShader("Shaders/default.frag", ShaderType::Fragment);
+	memcpy(&d.vertices[0], vertices, sizeof(vertices));
+	memcpy(&d.indices[0], indices, sizeof(indices));
 
-	GameObject* cone = new GameObject("Cone");
-	cone->SetMesh(meshes[0]);
-	cone->SetMaterial(mats[0]);
-	cone->GetTransform()->SetLocalPosition(Vector3(5.0f, 0.0f, -10.0f));
+	meshes.push_back(new Mesh(d));
 
-	GameObject* cylinder = new GameObject("Cylinder");
-	cylinder->SetMaterial(mats[0]);
-	cylinder->SetMesh(meshes[1]);
-	cylinder->GetTransform()->SetLocalPosition(Vector3(0.0f, 1.0f, 3.0f));
+	//------------------------------
+	// Creates the triangle material
+	//------------------------------
+	Material* mat = new Material();
+	mat->LoadShader("Shaders/default.vert", ShaderType::Vertex);
+	mat->LoadShader("Shaders/default.frag", ShaderType::Fragment);
+	mats.push_back(mat);
 
-	GameObject* cube = new GameObject("Cube");
-	cube->SetMaterial(mats[0]);
-	cube->SetMesh(meshes[2]);
-	cube->GetTransform()->SetLocalPosition(Vector3(10.0f, 0.0f, 0.0f));
+	//
+	// Creates the triangle object
+	//
+	GameObject* triangle = new GameObject("Triangle");
 
-	GameObject* sphere = new GameObject("Sphere");
-	sphere->SetMaterial(mats[0]);
-	sphere->SetMesh(meshes[3]);
-	sphere->GetTransform()->SetLocalPosition(Vector3(0.0f, -10.0f, 0.0f));
+	triangle->SetMesh(meshes[0]);
+	triangle->SetMaterial(mats[0]);
+	objects.push_back(triangle);
 
-	GameObject* torus = new GameObject("Torus");
-	torus->SetMaterial(mats[0]);
-	torus->SetMesh(meshes[4]);
-	torus->GetTransform()->SetLocalPosition(Vector3(0.0f, 3.0f, 20.0f));
-
-	objects.push_back(cone);
-	objects.push_back(cylinder);
-	objects.push_back(cube);
-	objects.push_back(sphere);
-	objects.push_back(torus);
-
-	camera->SetPosition(Vector3(0.0f, 0.0f, -10.0f));
+	camera.SetPosition(Vector3(0.0f, 0.0f, -2.0f));
 }
 
 void TestScene::Update(float dt)
@@ -68,20 +62,21 @@ void TestScene::Update(float dt)
 		polygonFlag = !polygonFlag;
 	}
 
-	if (camera->IsDirty())
+	if (camera.IsDirty())
 	{
-		camera->CalculateViewMatrix();
+		camera.UpdateViewMatrix();
 	}
 }
 
 void TestScene::Draw()
 {
+	objects[0]->GetMaterial()->SetFloat4x4("view", camera.GetView());
+	objects[0]->GetMaterial()->SetFloat4x4("projection", camera.GetProjection());
+	objects[0]->GetMaterial()->SetFloat3("viewPos", camera.GetPosition());
 	for (GameObject* o : objects)
 	{
-		// TODO: This is slow, update view/projection information once per frame
-		o->GetMaterial()->SetFloat4x4("view", camera->GetView());
-		o->GetMaterial()->SetFloat4x4("projection", camera->GetProjection(false));
-		o->GetMaterial()->SetFloat3("viewPos", camera->GetPosition());
+		o->GetMaterial()->SetFloat4x4("model", o->GetTransform()->GetWorldMatrix());
+		o->GetMaterial()->SetFloat4x4("modelInverseTranspose", o->GetTransform()->GetWorldInverseTranspose());
 
 		o->Draw();
 	}
@@ -105,49 +100,40 @@ void TestScene::MoveCamera(float dt)
 	float speed = 10.0f * dt;
 	if (Input::GetKey(GLFW_KEY_W))
 	{
-		camera->MoveForward(speed);
+		camera.MoveForward(speed);
 	}
 	else if (Input::GetKey(GLFW_KEY_S))
 	{
-		camera->MoveForward(-speed);
+		camera.MoveForward(-speed);
 	}
 
 	if (Input::GetKey(GLFW_KEY_A))
 	{
-		camera->MoveRight(-speed);
+		camera.MoveRight(-speed);
 	}
 	else if (Input::GetKey(GLFW_KEY_D))
 	{
-		camera->MoveRight(speed);
-	}
-
-	if (Input::GetKey(GLFW_KEY_Q))
-	{
-		camera->MoveUp(speed);
-	}
-	else if (Input::GetKey(GLFW_KEY_E))
-	{
-		camera->MoveUp(-speed);
+		camera.MoveRight(speed);
 	}
 
 	speed *= 10.0f;
 
 	if (Input::GetKey(GLFW_KEY_UP))
 	{
-		camera->Pitch(-speed);
+		camera.Pitch(-speed);
 	}
 	else if (Input::GetKey(GLFW_KEY_DOWN))
 	{
-		camera->Pitch(speed);
+		camera.Pitch(speed);
 	}
 
 	if (Input::GetKey(GLFW_KEY_LEFT))
 	{
-		camera->RotateY(-speed);
+		camera.RotateY(-speed);
 	}
 	else if (Input::GetKey(GLFW_KEY_RIGHT))
 	{
-		camera->RotateY(speed);
+		camera.RotateY(speed);
 	}
 
 	// Mouse controls
@@ -155,7 +141,7 @@ void TestScene::MoveCamera(float dt)
 	{
 		Vector2 diff = mousePosition - pMousePosition;
 
-		camera->RotateY(diff.x);
-		camera->Pitch(diff.y);
+		camera.RotateY(diff.x);
+		camera.Pitch(diff.y);
 	}
 }
